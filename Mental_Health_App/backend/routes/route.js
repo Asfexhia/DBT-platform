@@ -6,7 +6,7 @@ import multer from 'multer';
 import { create_journal, getPostsByUsername, update_journal, delete_journal} from '../controller/journal-controller.js';
 import { getAnonymousPosts, createAnonymousPost } from '../controller/anonymous-controller.js';
 import { createMood, getMoods } from '../controller/mood-controller.js'; 
-import { chatWithTherapist, analyzeWithCoze, chatWithTestTherapist } from '../controller/coze-controller.js';
+import { chatWithTherapist, analyzeWithCoze, chatWithTestTherapist, getUserAiUsage } from '../controller/coze-controller.js';
 const router = express.Router();
 import upload from '../multer/multerConfig.js';
 import upload1 from '../multer/multerConfig1.js';
@@ -56,5 +56,6 @@ router.post ('/api/moods/:username', createMood);
 router.post('/api/coze/chat', chatWithTherapist);
 router.post('/api/coze/test-chat', chatWithTestTherapist);
 router.post('/api/coze/analyze-quiz', analyzeWithCoze);
+router.get('/api/users/:username/ai-usage', getUserAiUsage);
 
 export default router; 

@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import Loader from 'react-js-loader';
 import Navbar from '../navbar/Navbar';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import './Therapist.css';
 
 const TypingAnimation = ({ color }) => (
@@ -52,6 +54,22 @@ const TestTherapist = () => {
           aiImages = Array.isArray(data.response.images) ? data.response.images : [];
         }
 
+  // Extract image URLs from text and convert to markdown images
+  // Use constructor to avoid escaping issues in JS string context
+  const urlRegex = new RegExp('(https?:\\/\\/[^\\s"\'<>]+\\.(?:png|jpe?g|gif|webp|svg))(?![^\\n])', 'gi');
+        const found = [];
+        aiText = aiText.replace(urlRegex, (m) => {
+          found.push(m);
+          return ``; // remove raw URL from text; we'll render as images below or via markdown
+        }).trim();
+
+        // If there are found images, append markdown image lines to the text so react-markdown will render them
+        if (found.length) {
+          const mdImages = found.map(u => `![](${u})`).join('\n\n');
+          aiText = `${aiText}${aiText ? '\n\n' : ''}${mdImages}`;
+          aiImages = [...aiImages, ...found];
+        }
+
         aiText = aiText.replace(/\*\*(.*?)\*\*/g, '$1');
         await new Promise(resolve => setTimeout(resolve, 600));
         setMessages([
@@ -90,7 +108,9 @@ const TestTherapist = () => {
         <div ref={chatBoxRef} className="chat-box">
           {messages.map((msg, index) => (
             <div key={index} className={`message ${msg.sender === 'user' ? 'user-message' : 'ai-message'}`}>
-              <div>{msg.text}</div>
+              <div className="ai-text">
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.text}</ReactMarkdown>
+              </div>
               {Array.isArray(msg.images) && msg.images.length > 0 && (
                 <div className="ai-images" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '8px' }}>
                   {msg.images.map((url, i) => (

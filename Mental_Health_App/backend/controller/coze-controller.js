@@ -1,4 +1,6 @@
 import axios from 'axios';
+import User from '../models/userModel.js';
+import Usage from '../models/usageModel.js';
 
 const COZE_API_TOKEN = 'pat_4wMiaXeC0PQaQbzZ3mZl4oADqDPytW0qlGrgqN1IEQHwefoQaqu4nEbqHrzN9KOf';
 const COZE_API_BASE = 'https://api.coze.cn';
@@ -69,6 +71,42 @@ export const chatWithTherapist = async (req, res) => {
       success: true,
       response: aiResponse
     });
+
+    // Increment user's train_result counter (non-blocking)
+    try {
+      const userId = req.user?.id || req.body?.userId || req.body?.username || null;
+      if (userId) {
+        // Try to find user by Mongo _id or username/email fallback
+        const query = userId.match && userId.match(/^[0-9a-fA-F]{24}$/) ? { _id: userId } : { username: userId };
+        const u = await User.findOne(query).exec();
+        if (u) {
+          u.train_result = (u.train_result || 0) + 1;
+          await u.save();
+        }
+      }
+    } catch (incErr) {
+      console.error('Failed to increment train_result counter:', incErr.message);
+      // don't fail the response on DB errors
+    }
+
+    // Create a Usage log document (non-blocking)
+    try {
+      const userId = req.user?.id || null;
+      const username = req.user?.username || req.body?.username || '';
+      await Usage.create({
+        user: userId || null,
+        username,
+        type: 'train',
+        bot_id: BOT_ID,
+        connector_uid: req.body?.connector_uid || '',
+        conversation_id: '',
+        chat_id: '',
+        success: true,
+        meta: { promptLength: String(fullPrompt.length) }
+      });
+    } catch (logErr) {
+      console.error('Failed to create Usage log (train):', logErr.message);
+    }
 
   } catch (error) {
     console.error('Error with Coze API (Therapist):', error.response?.data || error.message);
@@ -256,6 +294,41 @@ export const chatWithTestTherapist = async (req, res) => {
     await pushParts(candidate);
 
     const finalText = texts.join('\n\n').trim();
+
+    // Create a Usage log document (non-blocking) with conversation/chat ids
+    try {
+      const userId = req.user?.id || null;
+      const username = req.user?.username || req.body?.username || '';
+      await Usage.create({
+        user: userId || null,
+        username,
+        type: 'test',
+        bot_id: TEST_BOT_ID,
+        connector_uid: req.body?.connector_uid || '',
+        conversation_id: conversationId || '',
+        chat_id: chatId || '',
+        success: true,
+        meta: { messagesCount: allMessages.length }
+      });
+    } catch (logErr) {
+      console.error('Failed to create Usage log (test):', logErr.message);
+    }
+
+    // Increment user's test_result counter (non-blocking)
+    try {
+      const userId = req.user?.id || req.body?.userId || req.body?.username || null;
+      if (userId) {
+        const query = userId.match && userId.match(/^[0-9a-fA-F]{24}$/) ? { _id: userId } : { username: userId };
+        const u = await User.findOne(query).exec();
+        if (u) {
+          u.test_result = (u.test_result || 0) + 1;
+          await u.save();
+        }
+      }
+    } catch (incErr) {
+      console.error('Failed to increment test_result counter:', incErr.message);
+    }
+
     return res.json({
       success: true,
       response: { text: finalText, images }
@@ -336,5 +409,36 @@ export const analyzeWithCoze = async (req, res) => {
       message: 'An error occurred while analyzing the answers.',
       error: error.message
     });
+  }
+};
+
+// GET user AI usage: counts and recent usage entries
+export const getUserAiUsage = async (req, res) => {
+  try {
+    const { username } = req.params;
+    if (!username) return res.status(400).json({ success: false, message: 'username required' });
+
+    // Try to locate the user document
+    const user = await User.findOne({ username }).exec();
+    const userId = user?._id || null;
+
+    // Get counts from user doc (fallback to 0)
+    const train_result = user?.train_result || 0;
+    const test_result = user?.test_result || 0;
+
+    // Fetch last 10 usages
+    const recent = await Usage.find({ $or: [{ user: userId }, { username }] })
+      .sort({ createdAt: -1 })
+      .limit(10)
+      .lean()
+      .exec();
+
+    res.json({
+      success: true,
+      data: { train_result, test_result, recent }
+    });
+  } catch (error) {
+    console.error('Error fetching AI usage for user:', error.message);
+    res.status(500).json({ success: false, message: 'Failed to fetch usage', error: error.message });
   }
 };

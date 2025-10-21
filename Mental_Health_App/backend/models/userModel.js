@@ -39,6 +39,17 @@ const userSchema = new mongoose.Schema({
     type: String, // This will store the file path
     default: ''
   },
+  // Counters for Coze usage
+  // `test_result` increments when the user uses the Test therapist
+  // `train_result` increments when the user uses the main AI Therapist
+  test_result: {
+    type: Number,
+    default: 0
+  },
+  train_result: {
+    type: Number,
+    default: 0
+  },
   journals: [{
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Journal'

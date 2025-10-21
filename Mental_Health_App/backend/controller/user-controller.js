@@ -4,6 +4,7 @@ import jwt from 'jsonwebtoken';
 import passport from 'passport';
 import bcrypt from 'bcryptjs';
 import mongoose from 'mongoose';
+import logger from '../utils/logger.js';
 
 
 // User Signup
@@ -76,6 +77,12 @@ export const userLogin = async (req, res) => {
     // Check MongoDB connection status
     if (mongoose.connection.readyState !== 1) {
         console.error('MongoDB connection state:', mongoose.connection.readyState);
+        logger.authFailure({
+          username: username || '',
+          reason: 'db_unavailable',
+          connectionState: mongoose.connection.readyState,
+          ip: req.ip || req.headers['x-forwarded-for'] || ''
+        });
         return res.status(503).json({ 
             message: 'Database connection unavailable' 
         });
@@ -85,7 +92,14 @@ export const userLogin = async (req, res) => {
     const user = await User.findOne({ username }).maxTimeMS(5000);
 
     // Check if user exists and if the password is correct
-    if (!user || !bcrypt.compareSync(password, user.password)) {
+    if (!user) {
+      logger.authFailure({ username: username || '', reason: 'user_not_found', ip: req.ip || req.headers['x-forwarded-for'] || '' });
+      return res.status(401).json({ message: 'Invalid username or password' });
+    }
+
+    const passwordMatches = bcrypt.compareSync(password, user.password);
+    if (!passwordMatches) {
+      logger.authFailure({ username: username || '', reason: 'wrong_password', ip: req.ip || req.headers['x-forwarded-for'] || '' });
       return res.status(401).json({ message: 'Invalid username or password' });
     }
 
