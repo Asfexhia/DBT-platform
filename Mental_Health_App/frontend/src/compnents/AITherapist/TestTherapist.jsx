@@ -34,22 +34,30 @@ const TestTherapist = () => {
         },
         body: JSON.stringify({
           message: input,
-          conversationHistory: messages // Send conversation history for context
+          conversationHistory: messages
         })
       });
 
       const data = await response.json();
-      
+
       if (data.success) {
-        let aiMessage = data.response;
-        
-        // Replace **word** with <strong>word</strong>
-        aiMessage = aiMessage.replace(/\*\*(.*?)\*\*/g, '$1');
+        let aiText = '';
+        let aiImages = [];
 
-        // Simulate typing delay
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        // 回退：仅处理字符串或 { text, images }
+        if (typeof data.response === 'string') {
+          aiText = data.response;
+        } else if (data.response && typeof data.response === 'object') {
+          aiText = data.response.text || '';
+          aiImages = Array.isArray(data.response.images) ? data.response.images : [];
+        }
 
-        setMessages([...updatedMessages, { sender: 'ai', text: aiMessage }]);
+        aiText = aiText.replace(/\*\*(.*?)\*\*/g, '$1');
+        await new Promise(resolve => setTimeout(resolve, 600));
+        setMessages([
+          ...updatedMessages,
+          { sender: 'ai', text: aiText, images: aiImages }
+        ]);
       } else {
         throw new Error(data.message || 'Failed to get AI response');
       }
@@ -82,7 +90,14 @@ const TestTherapist = () => {
         <div ref={chatBoxRef} className="chat-box">
           {messages.map((msg, index) => (
             <div key={index} className={`message ${msg.sender === 'user' ? 'user-message' : 'ai-message'}`}>
-              {msg.text}
+              <div>{msg.text}</div>
+              {Array.isArray(msg.images) && msg.images.length > 0 && (
+                <div className="ai-images" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '8px' }}>
+                  {msg.images.map((url, i) => (
+                    <img key={i} src={url} alt={`ai-${i}`} style={{ maxWidth: '200px', borderRadius: '8px' }} />
+                  ))}
+                </div>
+              )}
             </div>
           ))}
           {loading && <TypingAnimation color="#007BFF" />}
