@@ -1,6 +1,7 @@
 import axios from 'axios';
 import User from '../models/userModel.js';
 import Usage from '../models/usageModel.js';
+import Chat from '../models/chatModel.js';
 
 const COZE_API_TOKEN = 'pat_4wMiaXeC0PQaQbzZ3mZl4oADqDPytW0qlGrgqN1IEQHwefoQaqu4nEbqHrzN9KOf';
 const COZE_API_BASE = 'https://api.coze.cn';
@@ -106,6 +107,26 @@ export const chatWithTherapist = async (req, res) => {
       });
     } catch (logErr) {
       console.error('Failed to create Usage log (train):', logErr.message);
+    }
+
+    // Persist chat history for user (non-blocking)
+    try {
+      const username = req.user?.username || req.body?.username || '';
+      const userId = req.user?.id || null;
+      if (username) {
+        await Chat.create({
+          user: userId || null,
+          username,
+          bot_id: BOT_ID,
+          conversation_id: '',
+          messages: [
+            { role: 'user', content: message },
+            { role: 'assistant', content: aiResponse }
+          ]
+        });
+      }
+    } catch (chatErr) {
+      console.error('Failed to persist chat (train):', chatErr.message);
     }
 
   } catch (error) {
@@ -295,7 +316,7 @@ export const chatWithTestTherapist = async (req, res) => {
 
     const finalText = texts.join('\n\n').trim();
 
-    // Create a Usage log document (non-blocking) with conversation/chat ids
+  // Create a Usage log document (non-blocking) with conversation/chat ids
     try {
       const userId = req.user?.id || null;
       const username = req.user?.username || req.body?.username || '';
@@ -333,6 +354,26 @@ export const chatWithTestTherapist = async (req, res) => {
       success: true,
       response: { text: finalText, images }
     });
+
+    // Persist chat history for user (non-blocking)
+    try {
+      const username = req.user?.username || req.body?.username || '';
+      const userId = req.user?.id || null;
+      if (username) {
+        await Chat.create({
+          user: userId || null,
+          username,
+          bot_id: TEST_BOT_ID,
+          conversation_id: conversationId || '',
+          messages: [
+            { role: 'user', content: message },
+            { role: 'assistant', content: finalText }
+          ]
+        });
+      }
+    } catch (chatErr) {
+      console.error('Failed to persist chat (test):', chatErr.message);
+    }
 
   } catch (error) {
     console.error('Error with Test Coze API:', {
@@ -440,5 +481,19 @@ export const getUserAiUsage = async (req, res) => {
   } catch (error) {
     console.error('Error fetching AI usage for user:', error.message);
     res.status(500).json({ success: false, message: 'Failed to fetch usage', error: error.message });
+  }
+};
+
+// GET user chat history
+export const getUserChats = async (req, res) => {
+  try {
+    const { username } = req.params;
+    if (!username) return res.status(400).json({ success: false, message: 'username required' });
+
+    const chats = await Chat.find({ username }).sort({ createdAt: -1 }).limit(50).lean().exec();
+    res.json({ success: true, data: chats });
+  } catch (error) {
+    console.error('Error fetching user chats:', error.message);
+    res.status(500).json({ success: false, message: 'Failed to fetch chats', error: error.message });
   }
 };

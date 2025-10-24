@@ -195,7 +195,6 @@
 
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { PhotoIcon } from '@heroicons/react/24/solid';
 import axios from 'axios';
 import Navbar from '../navbar/Navbar';
 
@@ -237,9 +236,7 @@ const UpdateJournal = () => {
         if (name === 'tags') setTags(value);
     };
 
-    const handleFileChange = (e) => {
-        setCoverPicture(e.target.files[0]);
-    };
+    // file input is not used in this form; coverPicture handled via backend URL
 
     const handleCancel = () => {
         navigate(`/${username}/profile`);

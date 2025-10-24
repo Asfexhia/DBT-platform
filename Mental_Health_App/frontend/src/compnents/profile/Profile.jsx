@@ -3,10 +3,7 @@ import Navbar from '../navbar/Navbar';
 import axios from 'axios';
 import { useParams, Link } from 'react-router-dom';
 import { API_ENDPOINTS } from '../../config/api';
-import API_BASE_URL from '../../config/api';
-
 import Loader from "react-js-loader";
-import { Audio } from 'react-loader-spinner';
 import Readjournal from '../journal/Readjournal';
 import defaultProfilePicture from './download2.jpg';
 

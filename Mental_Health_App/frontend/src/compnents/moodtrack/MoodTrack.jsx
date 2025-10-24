@@ -10,7 +10,7 @@ ChartJS.register(BarElement, CategoryScale, LinearScale, Tooltip, Legend);
 const MoodTrack = () => {
   const [selectedDate, setSelectedDate] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [mood, setMood] = useState(null);
+  // mood state not required for display; we persist moods directly
   const [moodData, setMoodData] = useState([]);
   
   const username = localStorage.getItem('tokenUser');
@@ -29,7 +29,7 @@ const MoodTrack = () => {
   };
 
   const handleMoodSelect = (selectedMood) => {
-    setMood(selectedMood);
+    // selectedMood saved directly to backend below
     axios.post(`http://localhost:4000/api/moods/${username}`, { date: selectedDate, mood: selectedMood })
       .then(response => {
         setMoodData(prevData => [...prevData, response.data]);
