@@ -42,8 +42,14 @@ export const chatWithTherapist = async (req, res) => {
 
     // Extract the AI response
     console.log('Coze API Response:', JSON.stringify(response.data, null, 2));
+    // If Coze indicates an error (non-zero code), return a clear error to the client
+    if (response.data && typeof response.data.code !== 'undefined' && response.data.code !== 0) {
+      console.error('Coze API returned error code:', response.data.code, response.data.msg || response.data);
+      return res.status(502).json({ success: false, message: response.data.msg || 'Coze API error', code: response.data.code, detail: response.data.detail || null });
+    }
     
-    let aiResponse = 'No response received';
+  let aiResponse = 'No response received';
+  let aiResponseText = aiResponse;
     
     if (response.data && response.data.messages && response.data.messages.length > 0) {
       // Find the assistant's answer message
@@ -68,9 +74,18 @@ export const chatWithTherapist = async (req, res) => {
     } else if (response.data && response.data.answer) {
       aiResponse = response.data.answer;
     }
+    // Normalize aiResponse to a string for safe checks and for returning to clients
+    if (typeof aiResponse === 'string') {
+      aiResponseText = aiResponse;
+    } else if (aiResponse && typeof aiResponse === 'object') {
+      // attempt to extract common text properties
+      aiResponseText = aiResponse.text || aiResponse.content || JSON.stringify(aiResponse);
+    } else {
+      aiResponseText = String(aiResponse);
+    }
 
     // Check for training success marker and update user progress
-    const isTrainingSuccess = aiResponse.includes('[本次教学成功]');
+    const isTrainingSuccess = String(aiResponseText || '').includes('[本次教学成功]');
     let newAchievements = [];
 
     // Update user progress (non-blocking)
@@ -133,7 +148,7 @@ export const chatWithTherapist = async (req, res) => {
 
     res.json({
       success: true,
-      response: aiResponse,
+      response: aiResponseText,
       trainingSuccess: isTrainingSuccess,
       newAchievements: newAchievements
     });
@@ -224,6 +239,12 @@ export const chatWithTestTherapist = async (req, res) => {
         'Content-Type': 'application/json'
       }
     });
+
+    // Check for error codes from Coze v3 start response
+    if (startResp.data && typeof startResp.data.code !== 'undefined' && startResp.data.code !== 0) {
+      console.error('Coze v3 start API error:', startResp.data.code, startResp.data.msg || startResp.data);
+      return res.status(502).json({ success: false, message: startResp.data.msg || 'Coze v3 API error', code: startResp.data.code, detail: startResp.data.detail || null });
+    }
 
     const startData = startResp.data?.data;
     if (!startData) {

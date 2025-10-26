@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import Loader from 'react-js-loader';
 import Navbar from '../navbar/Navbar';
 import './Therapist.css';
@@ -20,6 +22,20 @@ const Therapist = () => {
   useEffect(() => {
     fetchUserStats();
   }, []);
+
+  // Entry hint modal: show once per session for Therapist
+  const [showEntryHint, setShowEntryHint] = useState(false);
+  useEffect(() => {
+    try {
+      const seen = sessionStorage.getItem('seenFloatingHintTherapist');
+      if (!seen) setShowEntryHint(true);
+    } catch (e) {}
+  }, []);
+
+  const closeEntryHint = () => {
+    try { sessionStorage.setItem('seenFloatingHintTherapist', '1'); } catch (e) {}
+    setShowEntryHint(false);
+  };
 
   const fetchUserStats = async () => {
     try {
@@ -72,14 +88,40 @@ const Therapist = () => {
       
       if (data.success) {
         let aiMessage = data.response;
-        
-        // Replace **word** with <strong>word</strong>
+        let aiImages = [];
+
+        // Replace **word** with plain text
         aiMessage = aiMessage.replace(/\*\*(.*?)\*\*/g, '$1');
+
+        // Collect markdown links like [text](https://...) and image markdown ![alt](url)
+        const mdLinkRegex = /\[[^\]]*\]\((https?:\/\/[^)\s]+)\)/gi;
+        const mdImageRegex = /!\[[^\]]*\]\((https?:\/\/[^)\s]+)\)/gi;
+        const found = [];
+        aiMessage = aiMessage.replace(mdImageRegex, (m, p1) => {
+          if (p1) found.push(p1);
+          return '';
+        }).replace(mdLinkRegex, (m, p1) => {
+          if (p1) found.push(p1);
+          return '';
+        }).trim();
+
+        // Collect direct image URLs (file extensions)
+  const urlRegex = new RegExp('(https?:\\/\\/[^\\s<>]+\\.(?:png|jpe?g|gif|webp|svg))(?![^\\n])', 'gi');
+        aiMessage = aiMessage.replace(urlRegex, (m) => {
+          found.push(m);
+          return '';
+        }).trim();
+
+        if (found.length) {
+          // Do not append markdown image lines to the text to avoid double-rendering.
+          // Keep a separate images array and render images explicitly below.
+          aiImages = [...found];
+        }
 
         // Simulate typing delay
         await new Promise(resolve => setTimeout(resolve, 1000));
 
-        setMessages([...updatedMessages, { sender: 'ai', text: aiMessage }]);
+        setMessages([...updatedMessages, { sender: 'ai', text: aiMessage, images: aiImages }]);
 
         // Check for training success and new achievements
         if (data.trainingSuccess) {
@@ -88,6 +130,8 @@ const Therapist = () => {
             experience: prev.experience + 1
           }));
           showNotification('训练成功！获得1点经验值');
+          // mark that user completed training during this session
+          try { sessionStorage.setItem('needsMoodPrompt', '1'); } catch (e) {}
         }
 
         if (data.newAchievements && data.newAchievements.length > 0) {
@@ -129,6 +173,18 @@ const Therapist = () => {
   return (
     <>
       <Navbar />
+      {/* Entry hint modal for Therapist */}
+      {showEntryHint && (
+        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.45)', zIndex:9999, display:'flex', alignItems:'center', justifyContent:'center' }}>
+          <div style={{ background:'white', padding:20, borderRadius:12, minWidth:300, boxShadow:'0 20px 40px rgba(0,0,0,0.3)' }}>
+            <h3 style={{ marginBottom:8, fontSize:18, fontWeight:600 }}>Welcome to the DBT Coach</h3>
+            <p style={{ marginBottom:12 }}>Click the floating mood ball (double-click) to quickly record how you're feeling before or after a session.</p>
+            <div style={{ textAlign:'right' }}>
+              <button onClick={closeEntryHint} style={{ padding:'8px 12px', borderRadius:8, border:'1px solid #ddd' }}>Got it</button>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="therapist-container">
         {/* User Stats Display */}
         <div className="user-stats-header">
@@ -155,7 +211,16 @@ const Therapist = () => {
         <div ref={chatBoxRef} className="chat-box">
           {messages.map((msg, index) => (
             <div key={index} className={`message ${msg.sender === 'user' ? 'user-message' : 'ai-message'}`}>
-              {msg.text}
+              <div className="ai-text">
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.text}</ReactMarkdown>
+              </div>
+              {Array.isArray(msg.images) && msg.images.length > 0 && (
+                <div className="ai-images" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '8px' }}>
+                  {msg.images.map((url, i) => (
+                    <img key={i} src={url} alt={`ai-${i}`} style={{ maxWidth: '200px', borderRadius: '8px' }} />
+                  ))}
+                </div>
+              )}
             </div>
           ))}
           {loading && <TypingAnimation color="#007BFF" />}

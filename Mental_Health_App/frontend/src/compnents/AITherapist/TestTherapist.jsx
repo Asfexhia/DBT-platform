@@ -16,6 +16,19 @@ const TestTherapist = () => {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const chatBoxRef = useRef(null);
+  // Entry hint modal: show once per session for Test Therapist
+  const [showEntryHint, setShowEntryHint] = useState(false);
+  useEffect(() => {
+    try {
+      const seen = sessionStorage.getItem('seenFloatingHintTestTherapist');
+      if (!seen) setShowEntryHint(true);
+    } catch (e) {}
+  }, []);
+
+  const closeEntryHint = () => {
+    try { sessionStorage.setItem('seenFloatingHintTestTherapist', '1'); } catch (e) {}
+    setShowEntryHint(false);
+  };
 
   const handleSend = async (messageText = null) => {
     const textToSend = messageText || input;
@@ -43,7 +56,7 @@ const TestTherapist = () => {
 
       const data = await response.json();
 
-      if (data.success) {
+  if (data.success) {
         let aiText = '';
         let aiImages = [];
 
@@ -58,16 +71,22 @@ const TestTherapist = () => {
   // Extract image URLs from text and convert to markdown images
   // Use constructor to avoid escaping issues in JS string context
   const urlRegex = new RegExp('(https?:\\/\\/[^\\s"\'<>]+\\.(?:png|jpe?g|gif|webp|svg))(?![^\\n])', 'gi');
+        // Collect markdown image/link syntax (![alt](url) and [text](url)) first
+        const mdImageRegex = /!\[[^\]]*\]\((https?:\/\/[^)\s]+)\)/gi;
+        const mdLinkRegex = /\[[^\]]*\]\((https?:\/\/[^)\s]+)\)/gi;
         const found = [];
+        aiText = aiText.replace(mdImageRegex, (m, p1) => { if (p1) found.push(p1); return ''; })
+                       .replace(mdLinkRegex, (m, p1) => { if (p1) found.push(p1); return ''; });
+
+        // Also collect any direct image URLs (file extensions)
         aiText = aiText.replace(urlRegex, (m) => {
           found.push(m);
-          return ``; // remove raw URL from text; we'll render as images below or via markdown
+          return '';
         }).trim();
 
-        // If there are found images, append markdown image lines to the text so react-markdown will render them
+        // Do not append markdown image lines to the text to avoid double-rendering.
+        // Keep a separate images array and render images explicitly below.
         if (found.length) {
-          const mdImages = found.map(u => `![](${u})`).join('\n\n');
-          aiText = `${aiText}${aiText ? '\n\n' : ''}${mdImages}`;
           aiImages = [...aiImages, ...found];
         }
 
@@ -77,6 +96,10 @@ const TestTherapist = () => {
           ...updatedMessages,
           { sender: 'ai', text: aiText, images: aiImages }
         ]);
+        // if test result included in response from backend, mark for mood prompt
+        if (data.testResult && data.testResult !== 'none') {
+          try { sessionStorage.setItem('needsMoodPrompt', '1'); } catch (e) {}
+        }
       } else {
         throw new Error(data.message || 'Failed to get AI response');
       }
@@ -109,6 +132,18 @@ const TestTherapist = () => {
   return (
     <React.Fragment>
       <Navbar />
+        {/* Entry hint modal for Test Therapist */}
+        {showEntryHint && (
+          <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.45)', zIndex:9999, display:'flex', alignItems:'center', justifyContent:'center' }}>
+            <div style={{ background:'white', padding:20, borderRadius:12, minWidth:300, boxShadow:'0 20px 40px rgba(0,0,0,0.3)' }}>
+              <h3 style={{ marginBottom:8, fontSize:18, fontWeight:600 }}>DBT Coach Test</h3>
+              <p style={{ marginBottom:12 }}>When you're ready, double-click the floating mood ball to record how you're feeling.</p>
+              <div style={{ textAlign:'right' }}>
+                <button onClick={closeEntryHint} style={{ padding:'8px 12px', borderRadius:8, border:'1px solid #ddd' }}>Got it</button>
+              </div>
+            </div>
+          </div>
+        )}
       <div className="therapist-container">
         <h1 className="heading">DBT Coach Test</h1>
         <div ref={chatBoxRef} className="chat-box">

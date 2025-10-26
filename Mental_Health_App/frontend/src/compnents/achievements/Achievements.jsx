@@ -13,7 +13,6 @@ const Achievements = () => {
   const [unlockedAchievements, setUnlockedAchievements] = useState([]);
   const [lockedAchievements, setLockedAchievements] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [notification, setNotification] = useState(null);
 
   useEffect(() => {
     fetchAchievements();
@@ -44,10 +43,7 @@ const Achievements = () => {
     }
   };
 
-  const showNotification = (message) => {
-    setNotification(message);
-    setTimeout(() => setNotification(null), 3000);
-  };
+  // showNotification removed (unused here) to satisfy linter
 
   const getProgressPercentage = () => {
     return Math.min((userStats.experience / 10) * 100, 100);
@@ -168,14 +164,7 @@ const Achievements = () => {
           </div>
         </div>
 
-        {/* 通知 */}
-        {notification && (
-          <div className="notification">
-            <div className="notification-content">
-              🎉 {notification}
-            </div>
-          </div>
-        )}
+        {/* Notifications handled elsewhere; removed local notification to avoid unused state */}
       </div>
     </>
   );
