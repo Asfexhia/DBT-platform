@@ -135,6 +135,14 @@ const TestTherapist = () => {
           try { sessionStorage.setItem('needsMoodPrompt', '1'); } catch (e) {}
           setShowPostTestPrompt(true);
         }
+
+        // Also detect an explicit success marker in the AI text to ensure prompt shows
+        try {
+          if (typeof aiText === 'string' && aiText.includes('[本次教学成功]')) {
+            try { sessionStorage.setItem('needsMoodPrompt', '1'); } catch (e) {}
+            setShowPostTestPrompt(true);
+          }
+        } catch (e) {}
       } else {
         throw new Error(data.message || 'Failed to get AI response');
       }

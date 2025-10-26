@@ -162,6 +162,14 @@ const Therapist = () => {
 
         setMessages([...updatedMessages, { sender: 'ai', text: aiMessage, images: aiImages }]);
 
+        // If the assistant text contains an explicit training-success marker, trigger the post-training prompt
+        try {
+          if (typeof aiMessage === 'string' && aiMessage.includes('[本次教学成功]')) {
+            try { sessionStorage.setItem('needsMoodPrompt', '1'); } catch (e) {}
+            setShowPostTrainingPrompt(true);
+          }
+        } catch (e) {}
+
         // Check for training success and new achievements
         if (data.trainingSuccess) {
           setUserStats(prev => ({
