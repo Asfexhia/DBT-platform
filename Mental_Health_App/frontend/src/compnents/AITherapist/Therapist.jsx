@@ -82,13 +82,19 @@ const Therapist = () => {
     setTimeout(() => setNotification(null), 5000);
   };
 
-  const handleSend = async () => {
-    if (!input.trim()) return;
+  // Accept an optional messageText so quick-reply bubbles can call this directly
+  const handleSend = async (messageText = null) => {
+    const textToSend = (messageText !== null) ? messageText : input;
+    if (!textToSend || !textToSend.trim()) return;
 
-    const newMessage = { sender: 'user', text: input };
+    // Prevent sending while loading
+    if (loading) return;
+
+    const newMessage = { sender: 'user', text: textToSend };
     const updatedMessages = [...messages, newMessage];
     setMessages(updatedMessages);
-    setInput('');
+    // only clear the input if this was typed by the user
+    if (messageText === null) setInput('');
     setLoading(true);
 
     try {
@@ -100,7 +106,7 @@ const Therapist = () => {
           'Authorization': `Bearer ${user}`
         },
         body: JSON.stringify({
-          message: input,
+          message: textToSend,
           conversationHistory: messages // Send conversation history for context
         })
       });
@@ -277,6 +283,33 @@ const Therapist = () => {
           ))}
           {loading && <TypingAnimation color="#007BFF" />}
         </div>
+        {/* Quick reply bubbles to help users reply quickly */}
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', margin: '12px 16px' }}>
+          {[
+            'I feel better',
+            'I feel worse',
+            'It does not help',
+            'I still feel the same',
+            'Can you help me with steps?',
+            'I need a short exercise'
+          ].map((q, idx) => (
+            <button
+              key={idx}
+              onClick={() => handleSend(q)}
+              disabled={loading}
+              style={{
+                padding: '8px 12px',
+                borderRadius: 20,
+                border: '1px solid #ddd',
+                background: '#fff',
+                cursor: loading ? 'not-allowed' : 'pointer'
+              }}
+            >
+              {q}
+            </button>
+          ))}
+        </div>
+
         <div className="input-container">
           <input
             type="text"
