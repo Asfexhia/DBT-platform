@@ -15,10 +15,11 @@ import Createjournal from './compnents/journal/Createjournal.jsx';
 import Readjournal from './compnents/journal/Readjournal.jsx';
 import JournalDetail from './compnents/journal/Readonejournal.jsx';
 import MoodTrack from './compnents/moodtrack/MoodTrack.jsx';
-import Quiz from './compnents/quiz/Quiz.jsx';
+import Achievements from './compnents/achievements/Achievements.jsx';
 import UpdateJournal from './compnents/journal/Updatejournal.jsx';
 import Therapist from './compnents/AITherapist/Therapist.jsx';
 import TestTherapist from './compnents/AITherapist/TestTherapist.jsx';
+import TestAccessRoute from './components/TestAccessRoute.jsx';
 
 const PrivateRoute = ({ children }) => {
   const { username: usernameFromUrl } = useParams(); // Extract username from URL
@@ -48,9 +49,9 @@ function App() {
         <Route path="/:username/createanonymouspost" element={<PrivateRoute><AnonymousPost /></PrivateRoute>} />
         <Route path="/:username/allanonymousposts" element={<PrivateRoute><AllAnonymousPost /></PrivateRoute>} />
         <Route path="/:username/mood" element={<PrivateRoute><MoodTrack /></PrivateRoute>} />
-        <Route path="/:username/quiz" element={<PrivateRoute><Quiz /></PrivateRoute>} />
+        <Route path="/:username/achievements" element={<PrivateRoute><Achievements /></PrivateRoute>} />
         <Route path="/:username/therapist" element={<PrivateRoute><Therapist /></PrivateRoute>} />
-        <Route path="/:username/test-therapist" element={<PrivateRoute><TestTherapist /></PrivateRoute>} />
+        <Route path="/:username/test-therapist" element={<PrivateRoute><TestAccessRoute><TestTherapist /></TestAccessRoute></PrivateRoute>} />
         <Route path="/aboutus" element={<AboutUs />} />
         
 

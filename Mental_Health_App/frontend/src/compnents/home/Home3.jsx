@@ -16,9 +16,9 @@ const features = [
   },
   
   {
-    name: '1:1 Chat with AI Therapist',
+    name: '1:1 Chat with DBT Coach',
     description:
-      'Get 24/7 support from an AI therapist to manage your mental health.',
+      'Get 24/7 support from a DBT coach to manage your mental health.',
     icon: ArrowPathIcon,
   },
   {

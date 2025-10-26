@@ -17,10 +17,11 @@ const TestTherapist = () => {
   const [loading, setLoading] = useState(false);
   const chatBoxRef = useRef(null);
 
-  const handleSend = async () => {
-    if (!input.trim()) return;
+  const handleSend = async (messageText = null) => {
+    const textToSend = messageText || input;
+    if (!textToSend.trim()) return;
 
-    const newMessage = { sender: 'user', text: input };
+    const newMessage = { sender: 'user', text: textToSend };
     const updatedMessages = [...messages, newMessage];
     setMessages(updatedMessages);
     setInput('');
@@ -35,7 +36,7 @@ const TestTherapist = () => {
           'Authorization': `Bearer ${user}`
         },
         body: JSON.stringify({
-          message: input,
+          message: textToSend,
           conversationHistory: messages
         })
       });
@@ -93,6 +94,11 @@ const TestTherapist = () => {
     if (e.key === 'Enter') handleSend();
   };
 
+  // 新增：处理选项按钮点击事件
+  const handleOptionClick = (option) => {
+    handleSend(option);
+  };
+
   useEffect(() => {
     // Scroll to the bottom of the chat box whenever messages change
     if (chatBoxRef.current) {
@@ -104,7 +110,7 @@ const TestTherapist = () => {
     <React.Fragment>
       <Navbar />
       <div className="therapist-container">
-        <h1 className="heading">Test AI Assistant</h1>
+        <h1 className="heading">DBT Coach Test</h1>
         <div ref={chatBoxRef} className="chat-box">
           {messages.map((msg, index) => (
             <div key={index} className={`message ${msg.sender === 'user' ? 'user-message' : 'ai-message'}`}>
@@ -122,6 +128,39 @@ const TestTherapist = () => {
           ))}
           {loading && <TypingAnimation color="#007BFF" />}
         </div>
+        
+        {/* 新增：选项按钮容器 */}
+        <div className="option-buttons-container">
+          <button 
+            onClick={() => handleOptionClick('A')} 
+            className="option-button"
+            disabled={loading}
+          >
+            A
+          </button>
+          <button 
+            onClick={() => handleOptionClick('B')} 
+            className="option-button"
+            disabled={loading}
+          >
+            B
+          </button>
+          <button 
+            onClick={() => handleOptionClick('C')} 
+            className="option-button"
+            disabled={loading}
+          >
+            C
+          </button>
+          <button 
+            onClick={() => handleOptionClick('D')} 
+            className="option-button"
+            disabled={loading}
+          >
+            D
+          </button>
+        </div>
+
         <div className="input-container">
           <input
             type="text"
@@ -131,7 +170,7 @@ const TestTherapist = () => {
             placeholder="Type your message..."
             className="input-field"
           />
-          <button onClick={handleSend} className="send-button">Send</button>
+          <button onClick={() => handleSend()} className="send-button">Send</button>
         </div>
       </div>
     </React.Fragment>

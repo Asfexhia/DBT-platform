@@ -7,6 +7,8 @@ import { create_journal, getPostsByUsername, update_journal, delete_journal} fro
 import { getAnonymousPosts, createAnonymousPost } from '../controller/anonymous-controller.js';
 import { createMood, getMoods } from '../controller/mood-controller.js'; 
 import { chatWithTherapist, analyzeWithCoze, chatWithTestTherapist, getUserAiUsage, getUserChats } from '../controller/coze-controller.js';
+import { getUserAchievements } from '../controller/achievement-controller.js';
+import { getTestAccess, checkTestAccess } from '../middleware/testAccessMiddleware.js';
 const router = express.Router();
 import upload from '../multer/multerConfig.js';
 import upload1 from '../multer/multerConfig1.js';
@@ -25,7 +27,9 @@ router.get('/', (req, res) => {
         endpoints: {
             signup: 'POST /signup',
             login: 'POST /login',
-            users: 'GET /users'
+            users: 'GET /users',
+            achievements: 'GET /api/achievements/:username',
+            testAccess: 'GET /api/test-access/:username'
         }
     });
 });
@@ -54,9 +58,15 @@ router.post ('/api/moods/:username', createMood);
 
 // Coze API routes
 router.post('/api/coze/chat', chatWithTherapist);
-router.post('/api/coze/test-chat', chatWithTestTherapist);
+router.post('/api/coze/test-chat', checkTestAccess, chatWithTestTherapist);
 router.post('/api/coze/analyze-quiz', analyzeWithCoze);
 router.get('/api/users/:username/ai-usage', getUserAiUsage);
 router.get('/api/users/:username/chats', getUserChats);
 
-export default router; 
+// Achievement system routes
+router.get('/api/achievements/:username', getUserAchievements);
+
+// Test access control routes
+router.get('/api/test-access/:username', getTestAccess);
+
+export default router;

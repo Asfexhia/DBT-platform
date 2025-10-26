@@ -2,6 +2,7 @@ import axios from 'axios';
 import User from '../models/userModel.js';
 import Usage from '../models/usageModel.js';
 import Chat from '../models/chatModel.js';
+import { checkAndUnlockAchievements, updateLoginStreak } from './achievement-controller.js';
 
 const COZE_API_TOKEN = 'pat_4wMiaXeC0PQaQbzZ3mZl4oADqDPytW0qlGrgqN1IEQHwefoQaqu4nEbqHrzN9KOf';
 const COZE_API_BASE = 'https://api.coze.cn';
@@ -68,27 +69,74 @@ export const chatWithTherapist = async (req, res) => {
       aiResponse = response.data.answer;
     }
 
-    res.json({
-      success: true,
-      response: aiResponse
-    });
+    // Check for training success marker and update user progress
+    const isTrainingSuccess = aiResponse.includes('[本次教学成功]');
+    let newAchievements = [];
 
-    // Increment user's train_result counter (non-blocking)
+    // Update user progress (non-blocking)
     try {
-      const userId = req.user?.id || req.body?.userId || req.body?.username || null;
-      if (userId) {
-        // Try to find user by Mongo _id or username/email fallback
-        const query = userId.match && userId.match(/^[0-9a-fA-F]{24}$/) ? { _id: userId } : { username: userId };
-        const u = await User.findOne(query).exec();
-        if (u) {
-          u.train_result = (u.train_result || 0) + 1;
-          await u.save();
+      // Get username from Authorization header or request body
+      const authHeader = req.headers.authorization;
+      let username = null;
+      
+      if (authHeader && authHeader.startsWith('Bearer ')) {
+        username = authHeader.substring(7); // Remove 'Bearer ' prefix
+      }
+      
+      // Fallback to other sources
+      username = username || req.user?.username || req.body?.username || req.user?.id || req.body?.userId;
+      
+      console.log('Attempting to find user with identifier:', username);
+      
+      if (username) {
+        // Try to find user by username first, then by _id if it looks like an ObjectId
+        let query;
+        if (username.match && username.match(/^[0-9a-fA-F]{24}$/)) {
+          query = { _id: username };
+        } else {
+          query = { username: username };
         }
+        
+        console.log('Using query:', query);
+        const user = await User.findOne(query).exec();
+        
+        if (user) {
+          console.log('Found user:', user.username, 'Training success:', isTrainingSuccess);
+          
+          // Update login streak
+          await updateLoginStreak(user._id);
+
+          if (isTrainingSuccess) {
+            console.log('Updating user progress - before:', { train_result: user.train_result, totalTrainingCount: user.totalTrainingCount });
+            
+            // Increment experience points (train_result) and total training count
+            user.train_result = (user.train_result || 0) + 1;
+            user.totalTrainingCount = (user.totalTrainingCount || 0) + 1;
+            await user.save();
+            
+            console.log('Updated user progress - after:', { train_result: user.train_result, totalTrainingCount: user.totalTrainingCount });
+
+            // Check for achievements
+            newAchievements = await checkAndUnlockAchievements(user._id, 'training_success');
+          }
+          // Note: No else clause - only update when training is successful
+        } else {
+          console.log('User not found with identifier:', username);
+        }
+      } else {
+        console.log('No user identifier found in request');
       }
     } catch (incErr) {
-      console.error('Failed to increment train_result counter:', incErr.message);
+      console.error('Failed to update user progress:', incErr.message);
       // don't fail the response on DB errors
     }
+
+    res.json({
+      success: true,
+      response: aiResponse,
+      trainingSuccess: isTrainingSuccess,
+      newAchievements: newAchievements
+    });
 
     // Create a Usage log document (non-blocking)
     try {
@@ -316,6 +364,42 @@ export const chatWithTestTherapist = async (req, res) => {
 
     const finalText = texts.join('\n\n').trim();
 
+    // Check for test result markers and update user progress
+    const isTestPass = finalText.includes('[本次测试通过]');
+    const isTestFail = finalText.includes('[本次测试不通过]');
+    let newAchievements = [];
+
+    // Update user progress based on test results (non-blocking)
+    try {
+      const userId = req.user?.id || req.body?.userId || req.body?.username || null;
+      if (userId) {
+        const query = userId.match && userId.match(/^[0-9a-fA-F]{24}$/) ? { _id: userId } : { username: userId };
+        const user = await User.findOne(query).exec();
+        if (user) {
+          if (isTestPass) {
+            // Test passed: level up and reset experience
+            user.test_result = (user.test_result || 0) + 1;
+            user.train_result = 0;
+            await user.save();
+
+            // Check for level-based achievements
+            newAchievements = await checkAndUnlockAchievements(user._id, 'level_up');
+          } else if (isTestFail) {
+            // Test failed: increment failure count and reduce experience
+            user.testFailureCount = (user.testFailureCount || 0) + 1;
+            user.train_result = Math.max(0, (user.train_result || 0) - 3);
+            await user.save();
+
+            // Check for failure-based achievements
+            newAchievements = await checkAndUnlockAchievements(user._id, 'test_failure');
+          }
+          // Note: No else clause - only update when test result is explicit
+        }
+      }
+    } catch (incErr) {
+      console.error('Failed to update test progress:', incErr.message);
+    }
+
   // Create a Usage log document (non-blocking) with conversation/chat ids
     try {
       const userId = req.user?.id || null;
@@ -335,24 +419,11 @@ export const chatWithTestTherapist = async (req, res) => {
       console.error('Failed to create Usage log (test):', logErr.message);
     }
 
-    // Increment user's test_result counter (non-blocking)
-    try {
-      const userId = req.user?.id || req.body?.userId || req.body?.username || null;
-      if (userId) {
-        const query = userId.match && userId.match(/^[0-9a-fA-F]{24}$/) ? { _id: userId } : { username: userId };
-        const u = await User.findOne(query).exec();
-        if (u) {
-          u.test_result = (u.test_result || 0) + 1;
-          await u.save();
-        }
-      }
-    } catch (incErr) {
-      console.error('Failed to increment test_result counter:', incErr.message);
-    }
-
     return res.json({
       success: true,
-      response: { text: finalText, images }
+      response: { text: finalText, images },
+      testResult: isTestPass ? 'pass' : isTestFail ? 'fail' : 'none',
+      newAchievements: newAchievements
     });
 
     // Persist chat history for user (non-blocking)

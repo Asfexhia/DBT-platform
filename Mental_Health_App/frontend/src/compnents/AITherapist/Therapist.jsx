@@ -13,7 +13,37 @@ const Therapist = () => {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [userStats, setUserStats] = useState({ level: 0, experience: 0 });
+  const [notification, setNotification] = useState(null);
   const chatBoxRef = useRef(null);
+
+  useEffect(() => {
+    fetchUserStats();
+  }, []);
+
+  const fetchUserStats = async () => {
+    try {
+      const username = localStorage.getItem('tokenUser');
+      if (!username) return;
+
+      const response = await fetch(`http://localhost:4000/api/achievements/${username}`);
+      const data = await response.json();
+
+      if (data.success) {
+        setUserStats({
+          level: data.data.user.level,        // test_result (等级)
+          experience: data.data.user.experience // train_result (经验值)
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching user stats:', error);
+    }
+  };
+
+  const showNotification = (message) => {
+    setNotification(message);
+    setTimeout(() => setNotification(null), 5000);
+  };
 
   const handleSend = async () => {
     if (!input.trim()) return;
@@ -50,6 +80,24 @@ const Therapist = () => {
         await new Promise(resolve => setTimeout(resolve, 1000));
 
         setMessages([...updatedMessages, { sender: 'ai', text: aiMessage }]);
+
+        // Check for training success and new achievements
+        if (data.trainingSuccess) {
+          setUserStats(prev => ({
+            ...prev,
+            experience: prev.experience + 1
+          }));
+          showNotification('训练成功！获得1点经验值');
+        }
+
+        if (data.newAchievements && data.newAchievements.length > 0) {
+          data.newAchievements.forEach(achievement => {
+            showNotification(`🎉 解锁新成就: ${achievement.name} - ${achievement.description}`);
+          });
+        }
+
+        // Refresh user stats
+        fetchUserStats();
       } else {
         throw new Error(data.message || 'Failed to get AI response');
       }
@@ -74,11 +122,36 @@ const Therapist = () => {
     }
   }, [messages]);
 
+  const getProgressPercentage = () => {
+    return Math.min((userStats.experience / 10) * 100, 100);
+  };
+
   return (
     <>
       <Navbar />
       <div className="therapist-container">
-        <h1 className="heading">Your Personal AI Assistant</h1>
+        {/* User Stats Display */}
+        <div className="user-stats-header">
+          <div className="stats-item">
+            <span className="stats-label">等级</span>
+            <span className="stats-value level-badge">Lv.{userStats.level}</span>
+          </div>
+          <div className="stats-item">
+            <span className="stats-label">经验值</span>
+            <span className="stats-value">{userStats.experience}/10</span>
+          </div>
+          <div className="progress-container">
+            <div className="progress-bar">
+              <div 
+                className="progress-fill" 
+                style={{ width: `${getProgressPercentage()}%` }}
+              ></div>
+            </div>
+            <span className="progress-text">{getProgressPercentage().toFixed(0)}%</span>
+          </div>
+        </div>
+
+        <h1 className="heading">Your Personal DBT Coach</h1>
         <div ref={chatBoxRef} className="chat-box">
           {messages.map((msg, index) => (
             <div key={index} className={`message ${msg.sender === 'user' ? 'user-message' : 'ai-message'}`}>
@@ -98,6 +171,15 @@ const Therapist = () => {
           />
           <button onClick={handleSend} className="send-button">Send</button>
         </div>
+
+        {/* Notification */}
+        {notification && (
+          <div className="notification-popup">
+            <div className="notification-content">
+              {notification}
+            </div>
+          </div>
+        )}
       </div>
     </>
   );

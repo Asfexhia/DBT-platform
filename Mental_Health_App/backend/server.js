@@ -10,6 +10,7 @@ import session from 'express-session';
 import passport from 'passport';
 import userRoutes from './routes/route.js';
 import Connection from './database/db.js';
+import { initializeAchievements } from './controller/achievement-controller.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import bodyParser from 'body-parser';
@@ -46,12 +47,23 @@ const __dirname = path.dirname(__filename);
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.use('/upload1', express.static(path.join(__dirname, 'upload1')));
 
-Connection();
-app.use('/', userRoutes);
+// Initialize database connection and achievements
+const startServer = async () => {
+  await Connection();
+  
+  // Initialize achievements after database connection
+  setTimeout(async () => {
+    await initializeAchievements();
+  }, 1000);
+  
+  app.use('/', userRoutes);
 
-const port = process.env.PORT || 4000;
+  const port = process.env.PORT || 4000;
 
-server.listen(port, () => {
-  console.log("Server is running on port", port);
-});
+  server.listen(port, () => {
+    console.log("Server is running on port", port);
+  });
+};
+
+startServer();
 

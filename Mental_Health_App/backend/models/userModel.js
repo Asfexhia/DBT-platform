@@ -40,8 +40,8 @@ const userSchema = new mongoose.Schema({
     default: ''
   },
   // Counters for Coze usage
-  // `test_result` increments when the user uses the Test therapist
-  // `train_result` increments when the user uses the main AI Therapist
+  // `test_result` represents user's current level
+  // `train_result` represents user's current experience points
   test_result: {
     type: Number,
     default: 0
@@ -50,6 +50,27 @@ const userSchema = new mongoose.Schema({
     type: Number,
     default: 0
   },
+  // Achievement system fields
+  totalTrainingCount: {
+    type: Number,
+    default: 0
+  },
+  testFailureCount: {
+    type: Number,
+    default: 0
+  },
+  consecutiveLoginDays: {
+    type: Number,
+    default: 0
+  },
+  lastLoginDate: {
+    type: Date,
+    default: null
+  },
+  achievements: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Achievement'
+  }],
   journals: [{
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Journal'
