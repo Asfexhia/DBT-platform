@@ -46,18 +46,15 @@ const Therapist = () => {
     fetchUserStats();
   }, []);
 
-  // Entry hint modal: show once per session for Therapist
+  // Entry hint modal: show each time the user navigates into the Therapist page
   const [showEntryHint, setShowEntryHint] = useState(false);
   const [showPostTrainingPrompt, setShowPostTrainingPrompt] = useState(false);
+  // Show hint on every mount (i.e. when navigating into the page)
   useEffect(() => {
-    try {
-      const seen = sessionStorage.getItem('seenFloatingHintTherapist');
-      if (!seen) setShowEntryHint(true);
-    } catch (e) {}
+    setShowEntryHint(true);
   }, []);
 
   const closeEntryHint = () => {
-    try { sessionStorage.setItem('seenFloatingHintTherapist', '1'); } catch (e) {}
     setShowEntryHint(false);
   };
 
