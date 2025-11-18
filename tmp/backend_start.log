@@ -1,0 +1,7 @@
+nohup: ignoring input
+Attempting to connect to MongoDB with URL: mongodb://localhost:27017/mindfulness_app
+MongoDB connection state before connect: 0
+Database connected successfully!!!
+MongoDB connection state after connect: 1
+Server is running on port 4000
+Achievements initialized successfully

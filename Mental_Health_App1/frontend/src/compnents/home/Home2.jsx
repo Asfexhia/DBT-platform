@@ -4,8 +4,8 @@ const Home2 = () => {
   const [active, setActive] = useState('Wise Mind');
 
   return (
-    <section className="bg-white dark:bg-gray-900 py-12">
-      <div className="max-w-4xl mx-auto px-6 text-gray-900 dark:text-gray-100">
+    <section className="relative isolate bg-[#071226] text-white py-12">
+      <div className="max-w-4xl mx-auto px-6 text-white relative z-10">
         <h2 className="text-3xl font-extrabold mb-4">Mindfulness Skills</h2>
 
         <p className="mb-6 leading-relaxed">
@@ -20,7 +20,7 @@ const Home2 = () => {
               onClick={() => setActive(t)}
               role="tab"
               aria-selected={active === t}
-              className={`text-lg font-semibold px-4 py-2 rounded-md focus:outline-none ${active === t ? 'bg-teal-100 dark:bg-teal-800 text-teal-800 dark:text-teal-100' : 'text-gray-800 dark:text-gray-100'}`}
+              className={`text-lg font-semibold px-4 py-2 rounded-md focus:outline-none ${active === t ? 'bg-teal-600 text-white' : 'text-white'}`}
             >
               {t}
             </button>
@@ -28,7 +28,7 @@ const Home2 = () => {
         </div>
 
         {/* Content */}
-        <div className="prose max-w-none text-gray-800 dark:text-gray-100">
+        <div className="prose max-w-none text-white">
           {active === 'Wise Mind' && (
             <div>
               <h3 className="text-2xl font-bold mb-2">

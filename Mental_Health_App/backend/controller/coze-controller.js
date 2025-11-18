@@ -4,9 +4,16 @@ import Usage from '../models/usageModel.js';
 import Chat from '../models/chatModel.js';
 import { checkAndUnlockAchievements, updateLoginStreak } from './achievement-controller.js';
 
+// Previous Coze settings (kept for reference)
 const COZE_API_TOKEN = 'pat_4wMiaXeC0PQaQbzZ3mZl4oADqDPytW0qlGrgqN1IEQHwefoQaqu4nEbqHrzN9KOf';
 const COZE_API_BASE = 'https://api.coze.cn';
 const BOT_ID = '7517945743194734630';
+
+// Doubao (Ark) Chat API settings — updated to use the new provider
+const DOUBAO_API_BASE = 'https://ark.cn-beijing.volces.com/api/v3';
+const DOUBAO_MODEL = 'doubao-pro-32k-240615';
+// User-provided API key (replaceable)
+const DOUBAO_API_TOKEN = '0f939bc9-1359-466c-b1e5-f744a0d79978';
 
 // New API credentials for Test therapist
 const TEST_API_TOKEN = 'pat_k4m2Uj9g2T4yFH3HzI5DEeAB0L8QLANxpY9wlXzNJO135EvUdIFcbH3MLyfHfPU3';
@@ -27,15 +34,23 @@ export const chatWithTherapist = async (req, res) => {
     
     const fullPrompt = `${contextPrompt}Analyse the user's input and give suggestions or talk with them and provide an answer in paragraphs with spaces between paragraphs and points. Respond as if you are talking to the user in the first person, not the third person:\n\nUser: ${message}\nTherapist:`;
     
-    // 调用 Coze API
-    const response = await axios.post(`${COZE_API_BASE}/open_api/v2/chat`, {
-      bot_id: BOT_ID,
-      user: req.user?.id || 'anonymous_user_' + Date.now(),
-      query: fullPrompt,
-      stream: false
+    // Call Doubao (Ark) Chat Completions API
+    // Build messages array: include a system instruction then conversation history and the user message
+    const messages = [];
+    messages.push({ role: 'system', content: 'You are a helpful DBT coach. Provide supportive, concise, and practical DBT-style guidance.' });
+    if (conversationHistory && conversationHistory.length > 0) {
+      conversationHistory.forEach(msg => {
+        messages.push({ role: msg.sender === 'user' ? 'user' : 'assistant', content: msg.text });
+      });
+    }
+    messages.push({ role: 'user', content: message });
+
+    const response = await axios.post(`${DOUBAO_API_BASE}/chat/completions`, {
+      model: DOUBAO_MODEL,
+      messages
     }, {
       headers: {
-        'Authorization': `Bearer ${COZE_API_TOKEN}`,
+        'Authorization': `Bearer ${DOUBAO_API_TOKEN}`,
         'Content-Type': 'application/json'
       }
     });
@@ -51,23 +66,14 @@ export const chatWithTherapist = async (req, res) => {
   let aiResponse = 'No response received';
   let aiResponseText = aiResponse;
     
-    if (response.data && response.data.messages && response.data.messages.length > 0) {
-      // Find the assistant's answer message
-      const answerMessage = response.data.messages.find(msg => 
-        msg.role === 'assistant' && msg.type === 'answer'
-      );
-      
-      if (answerMessage && answerMessage.content) {
-        aiResponse = answerMessage.content;
-      } else {
-        // Fallback to last assistant message
-        const lastAssistantMessage = response.data.messages
-          .filter(msg => msg.role === 'assistant')
-          .pop();
-        
-        if (lastAssistantMessage && lastAssistantMessage.content) {
-          aiResponse = lastAssistantMessage.content;
-        }
+    // Doubao returns choices similar to OpenAI-like schema
+    if (response.data && Array.isArray(response.data.choices) && response.data.choices.length > 0) {
+      const choice = response.data.choices[0];
+      // choice.message.content expected
+      if (choice && choice.message && choice.message.content) {
+        aiResponse = choice.message.content;
+      } else if (choice && choice.text) {
+        aiResponse = choice.text;
       }
     } else if (response.data && response.data.reply) {
       aiResponse = response.data.reply;
@@ -225,17 +231,22 @@ export const chatWithTestTherapist = async (req, res) => {
       type: "question"
     });
 
-    // 1) 发起对话（v3）
-    const startResp = await axios.post(`${COZE_API_BASE}/v3/chat`, {
-      bot_id: TEST_BOT_ID,
-      user_id: req.user?.id || 'user_' + Date.now(),
-      stream: false,
-      auto_save_history: true,
-      additional_messages: additionalMessages,
-      parameters: {}
+    // For test therapist we also call the Doubao chat completion endpoint
+    const testMessages = [];
+    testMessages.push({ role: 'system', content: 'You are a DBT test evaluator. Provide concise test feedback and include markers like [本次测试通过] when appropriate.' });
+    if (conversationHistory && conversationHistory.length > 0) {
+      conversationHistory.forEach(msg => {
+        testMessages.push({ role: msg.sender === 'user' ? 'user' : 'assistant', content: msg.text });
+      });
+    }
+    testMessages.push({ role: 'user', content: message });
+
+    const startResp = await axios.post(`${DOUBAO_API_BASE}/chat/completions`, {
+      model: DOUBAO_MODEL,
+      messages: testMessages
     }, {
       headers: {
-        'Authorization': `Bearer ${TEST_API_TOKEN}`,
+        'Authorization': `Bearer ${DOUBAO_API_TOKEN}`,
         'Content-Type': 'application/json'
       }
     });
@@ -246,45 +257,15 @@ export const chatWithTestTherapist = async (req, res) => {
       return res.status(502).json({ success: false, message: startResp.data.msg || 'Coze v3 API error', code: startResp.data.code, detail: startResp.data.detail || null });
     }
 
-    const startData = startResp.data?.data;
-    if (!startData) {
-      return res.status(500).json({
-        success: false,
-        message: 'Invalid Coze v3 start response format',
-        details: startResp.data
-      });
-    }
-
-    const conversationId = startData.conversation_id;
-    const chatId = startData.id;
-
-    // 2) 轮询检索状态（retrieve）
-    const sleep = (ms) => new Promise(r => setTimeout(r, ms));
-    const MAX_POLLS = 20;
-    const POLL_INTERVAL_MS = 1200;
-
-    let status = startData.status;
-    for (let i = 0; i < MAX_POLLS && status === 'in_progress'; i++) {
-      await sleep(POLL_INTERVAL_MS);
-      const retrieveResp = await axios.get(`${COZE_API_BASE}/v3/chat/retrieve`, {
-        params: { conversation_id: conversationId, chat_id: chatId },
-        headers: { 'Authorization': `Bearer ${TEST_API_TOKEN}` }
-      });
-      status = retrieveResp.data?.data?.status;
-      if (status === 'failed') {
-        throw new Error('Coze chat failed to complete');
-      }
-    }
-
-    // 3) 拉取最终消息（message/list）
-    const listResp = await axios.get(`${COZE_API_BASE}/v3/chat/message/list`, {
-      params: { conversation_id: conversationId, chat_id: chatId },
-      headers: { 'Authorization': `Bearer ${TEST_API_TOKEN}` }
-    });
-
-    const allMessages = Array.isArray(listResp.data?.data) ? listResp.data.data : [];
+    // Doubao returns a completion response — extract assistant text
+    const allMessages = [];
     const texts = [];
     const images = [];
+    if (startResp.data && Array.isArray(startResp.data.choices) && startResp.data.choices.length > 0) {
+      const c = startResp.data.choices[0];
+      const content = c.message?.content || c.text || '';
+      if (content) texts.push(content);
+    }
 
     const resolveFileUrl = async (fileId) => {
       try {
