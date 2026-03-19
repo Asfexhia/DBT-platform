@@ -1,7 +1,5 @@
 # MentalHealthApp  
 
-## https://mindfulness-mental-health.netlify.app/
-
 MentalHealthApp is a comprehensive mental health application built using the MERN stack. It offers several features to help users manage their mental well-being, including cookie session login, a mood tracker, an AI therapist, a mood quiz, and anonymous sharing.
 
 ## Features
