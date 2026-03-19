@@ -1,7 +1,6 @@
 # DBT_Platform  
 
-DBT_Platform is a comprehensive mental health application built using the MERN stack. It offers several features to help users manage their mental well-being, including cookie session login, a mood tracker, an AI therapist, a mood quiz, and anonymous sharing.
-
+The GenAI-DBT platform was implemented as a web-based application integrating a conversational artificial intelligence (AI) system to support personalized DBT skill training. 
 ## Features
 
 ### Cookie Session Login
